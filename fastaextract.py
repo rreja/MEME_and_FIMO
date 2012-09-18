@@ -24,24 +24,28 @@ def process_file(fname,options,storedir):
     for k,v in storedir.items():
         outdir = os.path.join(os.path.dirname(fname),v)
         outfile = os.path.join(outdir,os.path.splitext(os.path.basename(fname))[0]+"_"+v+".fasta")
-        retrieve_fasta(options.method,bedfile,k,outfile,countLines,maxocc,ref,options)
+        outfile2 = os.path.join(outdir,os.path.splitext(os.path.basename(fname))[0]+"_"+v+".gff")
+        retrieve_fasta(options.method,bedfile,k,outfile,countLines,maxocc,ref,options,outfile2)
         
     
-def retrieve_fasta(mthd,bedfile,thresh,outfile,totalLines,maxocc,ref,options):
+def retrieve_fasta(mthd,bedfile,thresh,outfile,totalLines,maxocc,ref,options,outfile2):
     if(mthd == "count"):
         a = pybedtools.BedTool(bedfile, from_string=True).head(n=thresh,as_string=True)
+        pybedtools.BedTool(a,from_string=True).slop(g=options.gfile,l=options.up_dist,r=options.down_dist).saveas(outfile2)
         pybedtools.BedTool(a,from_string=True).slop(g=options.gfile,l=options.up_dist,r=options.down_dist).sequence(fi=ref,fo=outfile)
     elif(mthd == "pmo"):
         if thresh > 100:
             print "Your threshold for method=pmo should not be more than 100%"
         cutoff = float(thresh)/100*(maxocc)
         a = pybedtools.BedTool(bedfile, from_string=True)
+        a.filter(lambda m:float(m.score) > cutoff).slop(g=options.gfile,l=options.up_dist,r=options.down_dist).saveas(outfile2)
         a.filter(lambda m:float(m.score) > cutoff).slop(g=options.gfile,l=options.up_dist,r=options.down_dist).sequence(fi=ref,fo=outfile)
     elif(mthd == "pct"):
         if thresh > 100:
             print "Your threshold for method=pct should not be more than 100%"
         cutoff = int((float(thresh)/100)*totalLines)
         a = pybedtools.BedTool(bedfile, from_string=True).head(n=cutoff,as_string=True)
+        pybedtools.BedTool(a,from_string=True).slop(g=options.gfile,l=options.up_dist,r=options.down_dist).saveas(outfile2)
         pybedtools.BedTool(a,from_string=True).slop(g=options.gfile,l=options.up_dist,r=options.down_dist).sequence(fi=ref,fo=outfile)
         
 
@@ -85,8 +89,8 @@ def run():
     storedir = {}
     
     for k in thresholds:
-        dirname["outdir_"+k] = "top"+k   # This stores the informtion of which filepointer corresponds to which directory.
-        storedir[int(k)] =  "top"+k  # this stores which threshold corresponds to which file pointer.
+        dirname["outdir_"+k] = "top"+k+"u"+str(options.up_dist)+"d"+str(options.down_dist)   # This stores the informtion of which filepointer corresponds to which directory.
+        storedir[int(k)] =  "top"+k+"u"+str(options.up_dist)+"d"+str(options.down_dist)   # this stores which threshold corresponds to which file pointer.
     
     # Check if all the required arguments are provided, else exit     
     if not args:
