@@ -1,33 +1,70 @@
+import sys, os, pybedtools, operator
+from optparse import OptionParser , IndentedHelpFormatter
+import matplotlib.pyplot as plt
+
+
 
 def process_file(infile,fimoFiles,options):
     input = open(infile,'rt')
+    fullfile = {}
+    bedfile = ""
+    # Plotting intializations:
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    outfile = os.path.join(options.FIMOoutdir,os.path.splitext(os.path.basename(infile))[0]+"_FPrate.png")
+    # Start reading the peak-pair file and sort it.
     for line in input:
         if line.startswith("#"):
             continue
         if(len(line.split("\t")) == 9):
-            countLines = countLines+1
+            #countLines = countLines+1
             chrom,junk,junk,start,end,tag,strand,junk,attr = line.split("\t")
             fullfile[line] = float(tag)
     sortedfile = sorted(fullfile.iteritems(),key=operator.itemgetter(1),reverse=True)
+    # Create a string of the sorted gff file to create bedtool object.
     for k in sortedfile:
         bedfile = bedfile+k[0]
-    for k,v in storedir.items():
-        #outdir = os.path.join(os.path.dirname(fname),v)
-        #outfile = os.path.join(outdir,os.path.splitext(os.path.basename(fname))[0]+"_"+v+".fasta")
-        #outfile2 = os.path.join(outdir,os.path.splitext(os.path.basename(fname))[0]+"_"+v+".gff")
-        retrieve_fasta(options.method,bedfile,k,outfile,countLines,maxocc,ref,options,outfile2)
-        a = pybedtools.BedTool(bedfile, from_string=True).head(n=thresh,as_string=True)
-        pybedtools.BedTool(a,from_string=True).slop(g=options.gfile,l=options.up_dist,r=options.down_dist).sequence(fi=ref,fo=outfile)
+    # Create peak-pair bedtool object from the string
+    a = pybedtools.BedTool(bedfile, from_string=True).slop(g=options.gfile,l=options.up_dist,r=options.down_dist)
+    # Run through all the fimo output in the FIMO directory conatining fimo output for various motifs corresponding to the same peak-pair file
+    for fimo in fimoFiles:
+        intersect = {}
+        linecount = 0
+        matchcount = 0
+        x = []
+        y = []
+        # Calculate intersection.
+        b = a.intersect(pybedtools.BedTool(fimo),u=True)
+        # Create a dictionary of intersection results.
+        for i in b:
+            intersect[i[0]+"\t"+i[3]+"\t"+i[4]] = i[5]
+        # Check in the dictionary what pct of your ranked peak-pairs exists and call plotting function.
+        for k in a:
+            key = k[0]+"\t"+k[3]+"\t"+k[4]
+            if key in intersect:
+                matchcount += 1
+            else:
+                matchcount +=0
+            linecount +=1
+            x.append(linecount)
+            pct = (float(matchcount)/linecount)*100
+            y.append(pct)
+        plot_xy_on_graph(x,y,plt,ax,outfile,os.path.splitext(os.path.basename(fimo))[0])
+    plt.xlabel("Peak-pair rank")
+    plt.ylabel("% of peak-pairs with motifs")
+    plt.legend(loc='upper right')
+    plt.savefig(outfile)        
+
+def plot_xy_on_graph(x,y,plt,ax,outfile,label):
+     plt.plot(x,y,label=label)
     
-
-
-
-
-
-
-
-
-
+    
+    
+    
+    
+    
+    
+    
 
 usage = '''
 input_paths may be:
@@ -36,7 +73,7 @@ input_paths may be:
 
 
 example usages:
-python estimate_FP_sites_by_FIMO_output.py -i /usr/local/peak-pair.gff /usr/local/data/cwpair.gff -g sg07.txt -u 50 -d 50 --threshold="20 40 60" /usr/local/peak-pairs
+python estimate_FP_sites_by_FIMO_output.py -i /usr/local/peak-pair.gff /usr/local/data/cwpair.gff -g sg07.txt -u 50 -d 50  /usr/local/peak-pairs
 '''.lstrip()
 
 
@@ -83,7 +120,9 @@ def run():
     fimoFiles = []
     for name in os.listdir(options.FIMOoutdir):
             if name.endswith('.gff'):
-                fimoFiles.append(os.path.join(options.FIMOoutdir, name)) 
+                fimoFiles.append(os.path.join(options.FIMOoutdir, name))
+                
+    #outfile = os.path.join(options.FIMOoutdir,os.path.splitext(os.path.basename(args[0]))[0]+"_FPrate.png")
         
     if not os.path.isdir(args[0]):
         process_file(args[0],fimoFiles,options)
