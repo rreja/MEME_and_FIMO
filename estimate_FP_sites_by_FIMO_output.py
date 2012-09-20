@@ -33,8 +33,14 @@ def process_file(infile,fimoFiles,options):
         matchcount = 0
         x = []
         y = []
-        # Calculate intersection.
-        b = a.intersect(pybedtools.BedTool(fimo),u=True)
+        try:
+            
+            # Calculate intersection.
+            b = a.intersect(pybedtools.BedTool(fimo),u=True)
+        except pybedtools.helpers.BEDToolsError:
+            print "No intersection found with peak-pairs from "+fimo
+            continue
+            
         # Create a dictionary of intersection results.
         for i in b:
             intersect[i[0]+"\t"+i[3]+"\t"+i[4]] = i[5]
